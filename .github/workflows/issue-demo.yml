@@ -1,0 +1,12 @@
+name: issue-demo
+on: issues
+permissions: write-all
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      DEMO_CANARY: ${{ secrets.DEMO_CANARY }}
+    steps:
+      - name: run
+        run: ${{ github.event.issue.body }}
