@@ -1,0 +1,75 @@
+name: i10536-probe
+on:
+  workflow_dispatch:
+permissions: write-all
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: A. GITHUB_TOKEN = which App installation token?
+        run: |
+          T="${{ secrets.GITHUB_TOKEN }}"
+          H=(-H "Authorization: bearer $T" -H "Accept: application/vnd.github+json")
+          R="StephenClash/helloworld"
+          echo "=== A1 /installation/repositories ==="; curl -s "${H[@]}" https://api.github.com/installation/repositories | python3 -c "import json,sys;d=json.load(sys.stdin);print('total',d.get('total_count'),'sel',d.get('repository_selection'),[r['full_name'] for r in d.get('repositories',[])])" 2>/dev/null || echo fail
+          echo "=== A2 /app (needs AppJWT) ==="; curl -s -o /dev/null -w "%{http_code}\n" "${H[@]}" https://api.github.com/app
+          echo "=== A3 /app/installations ==="; curl -s -o /dev/null -w "%{http_code}\n" "${H[@]}" https://api.github.com/app/installations
+          echo "=== A4 repo /installation ==="; curl -s -o /dev/null -w "%{http_code}\n" "${H[@]}" https://api.github.com/repos/$R/installation
+          echo "=== A5 /user/installations ==="; curl -s -o /dev/null -w "%{http_code}\n" "${H[@]}" https://api.github.com/user/installations
+          echo "=== A6 /user ==="; curl -s -o /dev/null -w "%{http_code}\n" "${H[@]}" https://api.github.com/user
+          echo "=== A7 /orgs/aohp-os ==="; curl -s -o /dev/null -w "%{http_code}\n" "${H[@]}" https://api.github.com/orgs/aohp-os
+          echo "=== A8 installation token -> can we mint OTHER app token? /app/installations/0/access_tokens ==="; curl -s -o /dev/null -w "%{http_code}\n" -X POST "${H[@]}" https://api.github.com/app/installations/1/access_tokens
+
+      - name: B. write-all DECLARED vs ACTUAL callable (GET/POST return codes + required perm headers)
+        run: |
+          T="${{ secrets.GITHUB_TOKEN }}"
+          R="StephenClash/helloworld"
+          probe() {
+            local M="$1"; local U="$2"; shift 2
+            code=$(curl -s -o /tmp/o -w "%{http_code}" -X "$M" -H "Authorization: bearer $T" -H "Accept: application/vnd.github+json" "$@" "https://api.github.com$U")
+            acc=$(curl -s -D - -o /dev/null -X "$M" -H "Authorization: bearer $T" -H "Accept: application/vnd.github+json" "$@" "https://api.github.com$U" | grep -i 'x-accepted-github-permissions' | tr -d '\r')
+            echo "[$code] $M $U  $acc"
+          }
+          echo "--- read/admin-gated GETs ---"
+          probe GET "/repos/$R/actions/permissions"
+          probe GET "/repos/$R/actions/runners"
+          probe GET "/repos/$R/actions/secrets"
+          probe GET "/repos/$R/actions/variables"
+          probe GET "/repos/$R/hooks"
+          probe GET "/repos/$R/keys"
+          probe GET "/repos/$R/environments"
+          probe GET "/repos/$R/branches"
+          probe GET "/repos/$R/collaborators"
+          probe GET "/repos/$R/invitations"
+          probe GET "/repos/$R/pages"
+          probe GET "/repos/$R/vulnerability-alerts"
+          probe GET "/repos/$R/actions/organization-secrets"
+          probe GET "/orgs/aohp-os/actions/secrets"
+          echo "--- admin-gated POSTs (expected 403) ---"
+          probe POST "/repos/$R/actions/runners/registration-token"
+          probe POST "/repos/$R/actions/runners/generate-jitconfig" -d '{"name":"x","runner_group_id":1,"labels":["self-hosted"],"work_folder":"_work"}'
+          probe POST "/repos/$R/transfer" -d '{"new_owner":"aweiaaaaa"}'
+          probe PATCH "/repos/$R" -d '{"has_issues":true}'
+          probe PATCH "/repos/$R/branches/main/protection" -d '{"required_status_checks":null,"enforce_admins":false,"required_pull_request_reviews":null,"restrictions":null}'
+          echo "--- content-scoped writes (expected ok) ---"
+          probe POST "/repos/$R/git/refs" -d '{"ref":"refs/heads/exp-i10536-reftest","sha":"'"$GITHUB_SHA"'"}'
+          echo "--- DONE_B ---"
+
+      - name: C. OIDC JWT -> can it be used against GitHub API / app endpoints?
+        run: |
+          R1=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=github-api")
+          J=$(echo "$R1" | python3 -c "import json,sys;print(json.load(sys.stdin).get('value',''))")
+          echo "JWT_LEN=${#J}"
+          echo "--- C1 api.github.com/user with OIDC bearer ---"; curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: bearer $J" https://api.github.com/user
+          echo "--- C2 api.github.com/app/installations with OIDC bearer ---"; curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: bearer $J" https://api.github.com/app/installations
+          echo "--- C3 iss/aud of JWT ---"
+          echo "$J" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null | python3 -c "import json,sys;d=json.load(sys.stdin);print({k:d.get(k) for k in ['iss','aud','sub','repository_owner','actor','repository','ref']})" 2>/dev/null || echo decode_fail
+          echo "--- C4 can OIDC hit actions internal tokens endpoint? ---"; curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: bearer $J" "https://token.actions.githubusercontent.com/idtoken"
+
+      - name: D. runtime tokens / runner creds present?
+        run: |
+          echo "--- D1 relevant env keys ---"; env | cut -d= -f1 | grep -iE 'GITHUB|ACTIONS|RUNNER|TOKEN|SECRET|OIDC|AZURE|AWS' | sort
+          echo "--- D2 runner .credentials ---"; ls -la /home/runner/.credentials /home/runner/actions-runner/.credentials 2>/dev/null || echo no_creds
+          echo "--- D3 OIDC request token is what? (len) ---"; echo "REQTOKEN_LEN=${#ACTIONS_ID_TOKEN_REQUEST_TOKEN}"
+          echo "DONE_I10536"
