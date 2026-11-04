@@ -1,0 +1,39 @@
+name: i11100-read-ro
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: env check
+        run: |
+          for v in ACTIONS_RUNTIME_TOKEN ACTIONS_CACHE_URL; do eval "val=\$$v"; echo "$v len=${#val}"; done
+      - name: restore cache written by ANOTHER RUN same branch (READ-ONLY token)
+        uses: actions/cache/restore@v4
+        with:
+          key: i11100-poison
+          path: cachepayload
+      - name: inspect
+        run: |
+          echo "SAME_BRANCH_CROSSRUN_RO:"; cat cachepayload/marker.txt 2>/dev/null || echo "NOT_RESTORED"
+      - name: attempt cache write with READ-ONLY token
+        run: |
+          mkdir -p poison_ro && echo "RO_POISON $(date -u)" > poison_ro/p.txt
+        continue-on-error: true
+      - uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          key: i11100-poison-ro
+          path: poison_ro
+      - name: download artifact from another run
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: i11100-art
+          path: dl
+      - name: inspect artifact
+        run: |
+          echo "CROSSRUN_ARTIFACT_RO:"; cat dl/marker.txt 2>/dev/null || echo "NOT_AVAILABLE"

