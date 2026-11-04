@@ -12,47 +12,82 @@ jobs:
       - name: probe
         run: |
           set +e
-          R="https://github.com/StephenClash/helloworld.git"
           echo "I11277 START tokenlen=${#GITHUB_TOKEN} prefix=${GITHUB_TOKEN:0:4}"
           cd /tmp
           git clone --quiet https://x-access-token:${GITHUB_TOKEN}@github.com/StephenClash/helloworld.git r
           cd r
           git config user.email i11277@probe.local
           git config user.name i11277probe
+          ORIGIN="https://x-access-token:${GITHUB_TOKEN}@github.com/StephenClash/helloworld.git"
 
-          echo "=== BASE: ghs_ CREATE new workflow file (push) ==="
-          git checkout --quiet -b i11277-new origin/main
+          echo "=== BASE: ghs_ CREATE new workflow file (git push) ==="
+          git checkout --quiet -b b-new origin/main
           printf 'name: t\non: workflow_dispatch\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n' > .github/workflows/i11277-new.yml
-          git add .github/workflows/i11277-new.yml
-          git commit --quiet -m "add wf"
-          git push origin i11277-new 2>&1 | sed 's/^/CREATE: /'
-          echo "CREATE_EXIT=${PIPESTATUS[0]}"
+          git add .github/workflows/i11277-new.yml && git commit --quiet -m "add wf"
+          git push origin b-new 2>&1 | sed 's/^/PUSHCREATE: /'
+          echo "PUSHCREATE_EXIT=${PIPESTATUS[0]}"
 
-          echo "=== TEST A: ghs_ DELETE issue-demo.yml from main tree -> new branch ==="
-          git checkout --quiet -b i11277-del origin/main
-          git rm --quiet .github/workflows/issue-demo.yml
-          git commit --quiet -m "delete issue-demo wf"
-          git push origin i11277-del 2>&1 | sed 's/^/DELETE: /'
-          echo "DELETE_EXIT=${PIPESTATUS[0]}"
+          echo "=== TEST A: ghs_ DELETE issue-demo.yml (git push new branch) ==="
+          git checkout --quiet -b b-del origin/main
+          git rm --quiet .github/workflows/issue-demo.yml && git commit --quiet -m "del wf"
+          git push origin b-del 2>&1 | sed 's/^/PUSHDEL: /'
+          echo "PUSHDEL_EXIT=${PIPESTATUS[0]}"
 
-          echo "=== TEST B: ghs_ UPDATE pr-target.yml from main tree -> new branch ==="
-          git checkout --quiet -b i11277-upd origin/main
-          printf '\n# touched by i11277\n' >> .github/workflows/pr-target.yml
-          git add .github/workflows/pr-target.yml
-          git commit --quiet -m "touch pr-target"
-          git push origin i11277-upd 2>&1 | sed 's/^/UPDATE: /'
-          echo "UPDATE_EXIT=${PIPESTATUS[0]}"
+          echo "=== TEST B: ghs_ UPDATE pr-target.yml (git push new branch) ==="
+          git checkout --quiet -b b-upd origin/main
+          printf '\n# touched\n' >> .github/workflows/pr-target.yml
+          git add .github/workflows/pr-target.yml && git commit --quiet -m "upd wf"
+          git push origin b-upd 2>&1 | sed 's/^/PUSHUPDATE: /'
+          echo "PUSHUPDATE_EXIT=${PIPESTATUS[0]}"
 
-          echo "=== REST: ghs_ PUT workflow ==="
-          printf 'name: r\non: workflow_dispatch\n' > /tmp/w.yml
-          python3 - <<'PY' 2>&1 | sed 's/^/REST: /'
-          import os,base64,urllib.request,json
-          t=os.environ["GITHUB_TOKEN"]
-          body=json.dumps({"message":"x","content":base64.b64encode(open("/tmp/w.yml","rb").read()).decode(),"branch":"i11277-del"}).encode()
-          r=urllib.request.Request("https://api.github.com/repos/StephenClash/helloworld/contents/.github/workflows/i11277-rest.yml",data=body,headers={"Authorization":"Bearer "+t,"Accept":"application/vnd.github+json","Content-Type":"application/json"},method="PUT")
-          try:
-              u=urllib.request.urlopen(r);print(u.status,u.read()[:100])
-          except Exception as e:
-              print(getattr(e,'code','ERR'), getattr(e,'read',lambda:b'')()[:160])
+          echo "=== TEST C: ghs_ REST DELETE workflow file on branch b-del2 ==="
+          git checkout --quiet -b b-del2 origin/main
+          git push origin b-del2 >/dev/null 2>&1
+          python3 - <<'PY' 2>&1 | sed 's/^/RESTDEL: /'
+          import os,urllib.request,json
+          t=os.environ["GITHUB_TOKEN"]; R="StephenClash/helloworld"
+          def api(m,p,b=None):
+              d=json.dumps(b).encode() if b is not None else None
+              r=urllib.request.Request("https://api.github.com"+p,data=d,headers={"Authorization":"Bearer "+t,"Accept":"application/vnd.github+json","Content-Type":"application/json"},method=m)
+              try:
+                  u=urllib.request.urlopen(r); return u.status, u.read()[:120]
+              except Exception as e: return getattr(e,'code','ERR'), getattr(e,'read',lambda:b'')()[:160]
+          s,j=api("GET","/repos/%s/contents/.github/workflows/issue-demo.yml?ref=b-del2"%R)
+          sha=json.loads(j).get("sha") if s==200 else None
+          print("getsha", s, sha)
+          if sha:
+              print("del", api("DELETE","/repos/%s/contents/.github/workflows/issue-demo.yml"%R,{"message":"x","sha":sha,"branch":"b-del2"}))
           PY
-          echo "I11277 END"
+
+          echo "=== TEST D: ghs_ PUT workflow file (REST create) ==="
+          python3 - <<'PY' 2>&1 | sed 's/^/RESTPUT: /'
+          import base64,os,urllib.request,json
+          t=os.environ["GITHUB_TOKEN"]; R="StephenClash/helloworld"
+          c=base64.b64encode(b"name: r\non: workflow_dispatch\n").decode()
+          d=json.dumps({"message":"x","content":c,"branch":"b-del2"}).encode()
+          r=urllib.request.Request("https://api.github.com/repos/%s/contents/.github/workflows/i11277-rest.yml"%R,data=d,headers={"Authorization":"Bearer "+t,"Accept":"application/vnd.github+json","Content-Type":"application/json"},method="PUT")
+          try:
+              u=urllib.request.urlopen(r);print(u.status,u.read()[:120])
+          except Exception as e: print(getattr(e,'code','ERR'), getattr(e,'read',lambda:b'')()[:200])
+          PY
+
+          echo "=== TEST E: ghs_ Actions disable-workflow API (on self wf id) ==="
+          python3 - <<'PY' 2>&1 | sed 's/^/DISABLE: /'
+          import os,urllib.request,json
+          t=os.environ["GITHUB_TOKEN"]; R="StephenClash/helloworld"
+          def api(m,p):
+              r=urllib.request.Request("https://api.github.com"+p,headers={"Authorization":"Bearer "+t,"Accept":"application/vnd.github+json"},method=m)
+              try:
+                  u=urllib.request.urlopen(r);return u.status,u.read()[:120]
+              except Exception as e: return getattr(e,'code','ERR'), getattr(e,'read',lambda:b'')()[:200]
+          # find our own workflow id
+          s,j=api("GET","/repos/%s/actions/workflows?per_page=100"%R)
+          wid=None
+          if s==200:
+              for w in json.loads(j).get("workflows",[]):
+                  if w.get("path")==".github/workflows/i11277-wfdel.yml": wid=w["id"]
+          print("self_wf_id", wid)
+          if wid:
+              print("disable", api("PUT","/repos/%s/actions/workflows/%s/disable"%(R,wid)))
+              print("enable", api("PUT","/repos/%s/actions/workflows/%s/enable"%(R,wid)))
+          print("I11277 END")
