@@ -1,8 +1,5 @@
 name: i11165-ronson-A
-on:
-  push:
-    paths:
-      - 'i11165/**'
+on: push
 permissions:
   contents: read
 jobs:
