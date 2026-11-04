@@ -1,16 +1,27 @@
 name: i11132-recv
 on:
+  repository_dispatch:
+    types: [i11132-probe]
+  workflow_run:
+    workflows: ["issue-demo"]
+    types: [completed]
   deployment_status:
+  workflow_call:
 permissions: write-all
 jobs:
   recv:
     runs-on: ubuntu-latest
     steps:
-      - name: perms
+      - name: surface
         run: |
-          echo "EVENT=${{ github.event_name }} REF=${{ github.ref }} SHA=${{ github.sha }}"
-          echo "--- token permission (repo) ---"
-          curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/${{ github.repository }} | head -c 1200
-          echo
-          echo "--- rates/permission header ---"
-          curl -s -D - -o /dev/null -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/${{ github.repository }}/actions/permissions
+          echo "I11132_EVENT=${{ github.event_name }} REF=${{ github.ref }} SHA=${{ github.sha }}"
+          echo "ACTOR=${{ github.actor }} TRIG=${{ github.triggering_actor }}"
+          echo "--- GET /repos (permissions obj) ---"
+          curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/StephenClash/helloworld | grep -A8 '"permissions"'
+          echo "--- can create ref? ---"
+          curl -s -o /dev/null -w "POST /git/refs -> %{http_code}\n" -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
+            -d '{"ref":"refs/heads/i11132-recvtest","sha":"'"$GITHUB_SHA"'"}' \
+            https://api.github.com/repos/StephenClash/helloworld/git/refs
+          echo "--- read secret canary? ---"
+          echo "DEMO_CANARY_PRESENT=${DEMO_CANARY:+yes}"
