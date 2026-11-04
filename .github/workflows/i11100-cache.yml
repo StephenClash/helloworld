@@ -3,9 +3,15 @@ on:
   push:
     branches: [ exp-11100 ]
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'writer | read_wa | read_ro'
+        required: true
+        default: 'writer'
 permissions: write-all
 jobs:
   actdump:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,6 +23,7 @@ jobs:
           set +e
           sudo python3 i11100/memscan.py 2>&1 | tail -120
   writer:
+    if: github.event_name == 'push' || github.event.inputs.mode == 'writer'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,25 +41,91 @@ jobs:
         with:
           name: i11100-art
           path: cachepayload/marker.txt
-  reader_same_run:
+  read_same_run:
     needs: writer
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: restore cache (write-all token, same branch, other job)
-        uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v4
         with:
           key: i11100-poison
           path: cachepayload
-      - name: inspect restored cache
+      - name: inspect
         run: |
-          echo "SAME_BRANCH_JOB_RESTORED:"; cat cachepayload/marker.txt 2>/dev/null || echo "NOT_RESTORED"
-      - name: download artifact (own token, cross-job same run)
-        uses: actions/download-artifact@v4
+          echo "SAME_RUN_JOB_RESTORED:"; cat cachepayload/marker.txt 2>/dev/null || echo "NOT_RESTORED"
+      - uses: actions/download-artifact@v4
         continue-on-error: true
         with:
           name: i11100-art
           path: dl
       - name: inspect artifact
         run: |
-          echo "SAME_RUN_CROSSJOB_ARTIFACT:"; cat dl/marker.txt 2>/dev/null || echo "NOT_AVAILABLE"
+          echo "SAME_RUN_ARTIFACT:"; cat dl/marker.txt 2>/dev/null || echo "NOT_AVAILABLE"
+  reader_wa:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'read_wa'
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - uses: actions/checkout@v4
+      - name: env check
+        run: |
+          for v in ACTIONS_RUNTIME_TOKEN ACTIONS_CACHE_URL ACTIONS_RESULTS_URL; do eval "val=\$$v"; echo "$v len=${#val}"; done
+      - name: restore cache from ANOTHER RUN same branch (write-all)
+        uses: actions/cache/restore@v4
+        with:
+          key: i11100-poison
+          path: cachepayload
+      - name: inspect
+        run: |
+          echo "CROSSRUN_WA_CACHE:"; cat cachepayload/marker.txt 2>/dev/null || echo "NOT_RESTORED"
+      - uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          key: i11100-poison-wa-${{ github.run_id }}
+          path: cachepayload
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: i11100-art
+          path: dl
+      - name: inspect artifact
+        run: |
+          echo "CROSSRUN_WA_ARTIFACT:"; cat dl/marker.txt 2>/dev/null || echo "NOT_AVAILABLE"
+  reader_ro:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'read_ro'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: env check
+        run: |
+          for v in ACTIONS_RUNTIME_TOKEN ACTIONS_CACHE_URL; do eval "val=\$$v"; echo "$v len=${#val}"; done
+      - name: restore cache from ANOTHER RUN same branch (read-only token)
+        uses: actions/cache/restore@v4
+        with:
+          key: i11100-poison
+          path: cachepayload
+      - name: inspect
+        run: |
+          echo "CROSSRUN_RO_CACHE:"; cat cachepayload/marker.txt 2>/dev/null || echo "NOT_RESTORED"
+      - name: attempt cache WRITE with read-only token
+        run: |
+          mkdir -p poison_ro && echo "RO_POISON $(date -u)" > poison_ro/p.txt
+      - uses: actions/cache/save@v4
+        id: ro_save
+        continue-on-error: true
+        with:
+          key: i11100-poison-ro-${{ github.run_id }}
+          path: poison_ro
+      - name: report ro save outcome
+        run: echo "RO_SAVE_OUTCOME=${{ steps.ro_save.outcome }}"
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: i11100-art
+          path: dl
+      - name: inspect artifact
+        run: |
+          echo "CROSSRUN_RO_ARTIFACT:"; cat dl/marker.txt 2>/dev/null || echo "NOT_AVAILABLE"
