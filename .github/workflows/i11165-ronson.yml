@@ -1,0 +1,37 @@
+name: exp11165-ronson
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: "label string for job A"
+        required: false
+      runnerjson:
+        description: "json array of labels for job B"
+        required: false
+permissions:
+  contents: read
+jobs:
+  A_plain_expr_label:
+    runs-on: ${{ github.event.inputs.runner }}
+    steps:
+      - name: show
+        run: |
+          echo "A_PLAIN_RAN host=$HOSTNAME"
+          echo "A_ImageOS=$ImageOS A_ImageVersion=$ImageVersion"
+  B_json_expr_labels:
+    runs-on: ${{ fromJson(github.event.inputs.runnerjson) }}
+    steps:
+      - name: show
+        run: |
+          echo "B_JSON_RAN host=$HOSTNAME"
+          echo "B_ImageOS=$ImageOS"
+  C_concat_expr:
+    runs-on: ${{ github.event.inputs.runner }}-latest
+    steps:
+      - name: show
+        run: echo "C_CONCAT_RAN host=$HOSTNAME ImageOS=$ImageOS"
+  D_hardcoded_selfhosted:
+    runs-on: self-hosted
+    steps:
+      - name: show
+        run: echo "D_SELFHOSTED_RAN host=$HOSTNAME"
