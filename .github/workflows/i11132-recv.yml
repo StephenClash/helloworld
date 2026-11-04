@@ -7,28 +7,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: dump
+        env:
+          GH: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -x
+          exec 2>&1
           OUT=/tmp/out.txt
-          {
-            echo "EVENT=${{ github.event_name }}"
-            echo "REF=${{ github.ref }}"
-            echo "SHA=${{ github.sha }}"
-            echo "ACTOR=${{ github.actor }}"
-            echo "TRIG=${{ github.triggering_actor }}"
-            echo "=== /repos permissions ==="
-            curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/StephenClash/helloworld | tr ',' '\n' | grep -iE 'admin|maintain|push|triage|pull' | head -20
-            echo "=== POST /git/refs ==="
-            curl -s -o /dev/null -w "refs -> %{http_code}\n" -X POST -H "Authorization: token $GITHUB_TOKEN" -d "{\"ref\":\"refs/heads/i11132-recvtest\",\"sha\":\"$GITHUB_SHA\"}" https://api.github.com/repos/StephenClash/helloworld/git/refs
-            echo "=== POST /git/refs PATCH main (should be dangerous) ==="
-            curl -s -o /dev/null -w "patch main -> %{http_code}\n" -X PATCH -H "Authorization: token $GITHUB_TOKEN" -d "{\"sha\":\"$GITHUB_SHA\",\"force\":false}" https://api.github.com/repos/StephenClash/helloworld/git/refs/heads/main
-            echo "=== secrets canary ==="
-            echo "DEMO_CANARY_SET=${DEMO_CANARY:+YES}"
-            echo "=== /actions/permissions ==="
-            curl -s -w "\nperm-reader -> %{http_code}\n" -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/StephenClash/helloworld/actions/permissions
-          } > $OUT 2>&1
-          B64=$(base64 -w0 < $OUT)
-          curl -s -o /dev/null -w "putout -> %{http_code}\n" -X PUT \
-            -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
-            -d "{\"message\":\"i11132 out\",\"content\":\"$B64\",\"branch\":\"exp-11132\"}" \
-            https://api.github.com/repos/StephenClash/helloworld/contents/i11132-out.txt || true
+          : > $OUT
+          echo "EVENT=${{ github.event_name }}" >> $OUT
+          echo "REF=${{ github.ref }}" >> $OUT
+          echo "SHA=${{ github.sha }}" >> $OUT
+          echo "ACTOR=${{ github.actor }}" >> $OUT
+          echo "TRIG=${{ github.triggering_actor }}" >> $OUT
+          echo "TOKEN_LEN=${#GH}" >> $OUT
+          echo "=== whoami ===" >> $OUT
+          curl -s -D - -o /tmp/body.txt -H "Authorization: token $GH" https://api.github.com/user | head -5 >> $OUT
+          head -c 300 /tmp/body.txt >> $OUT
+          echo >> $OUT
+          echo "=== repo permissions ===" >> $OUT
+          curl -s -H "Authorization: token $GH" https://api.github.com/repos/StephenClash/helloworld >> /tmp/repo.txt
+          python3 -c "import json;d=json.load(open('/tmp/repo.txt'));print('permissions=',d.get('permissions'))" >> $OUT 2>&1 || cat /tmp/repo.txt >> $OUT
+          echo "=== POST /git/refs (write test) ===" >> $OUT
+          curl -s -o /tmp/r1.txt -w "code=%{http_code}" -X POST -H "Authorization: token $GH" -d "{\"ref\":\"refs/heads/i11132-recvtest\",\"sha\":\"${{ github.sha }}\"}" https://api.github.com/repos/StephenClash/helloworld/git/refs >> $OUT
+          echo >> $OUT; head -c 200 /tmp/r1.txt >> $OUT; echo >> $OUT
+          echo "=== actions/permissions ===" >> $OUT
+          curl -s -o /tmp/r2.txt -w "code=%{http_code}" -H "Authorization: token $GH" https://api.github.com/repos/StephenClash/helloworld/actions/permissions >> $OUT
+          echo >> $OUT; cat /tmp/r2.txt >> $OUT; echo >> $OUT
+          echo "=== DEMO_CANARY set? ${DEMO_CANARY:+YES} / value_len=${#DEMO_CANARY} ===" >> $OUT
+          echo "=== git push out ===" >> $OUT
+          git config user.email "i11132@local"
+          git config user.name "i11132"
+          cp $OUT ./i11132-out.txt
+          git add -f ./i11132-out.txt
+          git commit -m "i11132 out"
+          git push "https://x-access-token:$GH@github.com/StephenClash/helloworld" HEAD:exp-11132 >> $OUT 2>&1 && echo "PUSH_OK" >> $OUT || echo "PUSH_FAIL" >> $OUT
