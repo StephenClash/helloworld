@@ -8,13 +8,14 @@ jobs:
       - name: probe
         env:
           CANARY: ${{ secrets.DEMO_CANARY }}
-          TOKEN: ${{ github.token }}
+          TOK: ${{ github.token }}
         run: |
           echo "EVENT=${{ github.event_name }}"
-          echo "ACTOR=${{ github.actor }}"
           echo "RAW=${{ github.event.comment.body }}"
-          echo "UID=$(id -u)"
-          echo "CANARY_SHA=$(printf %s "$CANARY" | sha256sum | cut -c1-16)"
-          REF="refs/heads/prrc2-$(date +%s)"
-          CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Authorization: token $TOKEN" "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/git/refs" -d "{\"ref\":\"$REF\",\"sha\":\"${{ github.event.pull_request.base.sha }}\"}")
-          echo "CREATE_REF=$CODE REF=$REF"
+          echo "TOK_LEN=${#TOK}"
+          WHO=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TOK" "$GITHUB_API_URL/user")
+          echo "WHOAMI_CODE=$WHO"
+          REF="refs/heads/prrc3-$(date +%s)"
+          CODE=$(curl -s -o /tmp/ref.out -w "%{http_code}" -X POST -H "Authorization: Bearer $TOK" -H "Accept: application/vnd.github+json" "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/git/refs" -d "{\"ref\":\"$REF\",\"sha\":\"${{ github.event.pull_request.base.sha }}\"}")
+          echo "CREATE_REF=$CODE"
+          head -c 200 /tmp/ref.out
