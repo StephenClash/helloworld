@@ -10,4 +10,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: run diff
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash .github/i11099_probe.sh
