@@ -1,8 +1,39 @@
-name: i11408-allowlist-probe
+name: i11408-allowlist-probe2
 on: push
 permissions: write-all
 jobs:
-  thirdparty-missing:
+  token-reach:
+    runs-on: ubuntu-latest
+    env:
+      GH_T: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: probe-admin-surface
+        run: |
+          b="https://api.github.com/repos/$GITHUB_REPOSITORY"
+          c(){ curl -s -o /dev/null -w "$1=%{http_code}\n" -H "Authorization: token $GH_T" -H "Accept: application/vnd.github+json" "$2"; }
+          c GET_PERM  "$b/actions/permissions"
+          c GET_WFPERM "$b/actions/permissions/workflow"
+          c GET_SELECTED "$b/actions/permissions/selected-actions"
+          c GET_ACCESS "$b/actions/permissions/access"
+          c GET_FORKAPPR "$b/actions/permissions/fork-pr-contributor-approval"
+          c GET_RUNNERS "$b/actions/runners"
+          c GET_RUNNERGRP "$b/actions/runner-groups"
+          c GET_ENV "$b/environments"
+          c GET_SECRETS "$b/actions/secrets"
+          c GET_KEYS "$b/keys"
+          c GET_COLLAB "$b/collaborators"
+          echo "--- write/mint attempts (low-noise) ---"
+          c POST_REGTOKEN "$b/actions/runners/registration-token"
+          c POST_PULLS "$b/pulls"
+          echo "--- oidc ---"
+          c GET_OIDCSUB "$b/actions/oidc/customization/sub"
+  tp-existing-badref:
     runs-on: ubuntu-latest
     steps:
-      - uses: zzz-no-such-owner-11408/no-such-action-11408@v1
+      - uses: peter-evans/create-pull-request@zzz-nope-11408
+  gh-owned-nonaction:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: github/gitignore@main
+  reusable-same-repo-missing:
+    uses: StephenClash/helloworld/.github/workflows/no-such-reusable-i11408.yml@main
