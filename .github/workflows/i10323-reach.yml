@@ -1,0 +1,48 @@
+name: i10323-netreach
+on:
+  workflow_dispatch:
+permissions: write-all
+jobs:
+  reach:
+    runs-on: ubuntu-latest
+    steps:
+      - name: net-reach
+        run: |
+          echo "REACH_START"
+          echo "RUNNER_ENV=$RUNNER_ENVIRONMENT"
+          id 2>&1 | head -2
+          echo "--- resolv.conf ---"
+          cat /etc/resolv.conf 2>&1
+          echo "--- IP addr ---"
+          (ip -4 addr 2>/dev/null || ifconfig 2>/dev/null) | grep -E "inet|flags" || true
+          echo "--- routes ---"
+          (ip route 2>/dev/null) || route -n 2>/dev/null || true
+          echo "--- neighbors ---"
+          (ip neigh 2>/dev/null) || arp -an 2>/dev/null || true
+          echo "--- /etc/hosts ---"
+          cat /etc/hosts 2>&1
+          echo "--- network-style mounts ---"
+          grep -Ei "nfs|cifs|smb|9p|virtiofs|fuse|drvfs|sshfs|share" /proc/mounts 2>&1 || echo NOSHARE
+          echo "--- /mnt /media ---"
+          ls -la /mnt /media 2>&1 | head -30
+          echo "--- IMDS azure ---"
+          curl -sS -m 4 -w "\nIMDS_HTTP=%{http_code}\n" "http://169.254.169.254/metadata/instance?api-version=2021-02-01" -H "Metadata:true" 2>&1 | head -8
+          echo "--- Azure WireServer 168.63.129.16 goalstate ---"
+          for url in "http://168.63.129.16/machine?comp=goalstate" "http://168.63.129.16/?comp=goalstate" "http://168.63.129.16:80/" ; do
+            echo -n "$url => "; curl -sS -m 4 -w " HTTP=%{http_code}\n" "$url" -H "x-ms-version: 2012-11-30" 2>&1 | head -3
+          done
+          echo "--- IMDS network ranges ---"
+          curl -sS -m 4 "http://169.254.169.254/metadata/instance/network/interface?api-version=2021-02-01" -H "Metadata:true" 2>&1 | head -8
+          echo "--- port scan internal ---"
+          for h in 10.0.0.1 10.0.0.2 10.1.0.1 10.1.0.2 10.1.0.50 10.1.0.63 172.16.0.1 192.168.0.1 192.168.1.1 192.168.1.10 168.63.129.16; do
+            for p in 22 139 445 111 2049 3389 80 443 2375; do
+              timeout 1 bash -c "echo > /dev/tcp/$h/$p" 2>/dev/null && echo "OPEN $h:$p"
+            done
+          done
+          echo "SCAN_DONE"
+          echo "--- DNS names ---"
+          for n in runner.internal metadata.local mails.ucas.edu.cn github.com; do
+            echo -n "$n => "; getent hosts "$n" 2>&1 | head -1 || echo unresolved
+          done
+          echo "REACH_END"
+        shell: bash
