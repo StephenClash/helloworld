@@ -92,6 +92,31 @@ jobs:
       - name: inspect artifact
         run: |
           echo "CROSSRUN_WA_ARTIFACT:"; cat dl/marker.txt 2>/dev/null || echo "NOT_AVAILABLE"
+  rawprobe:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'rawprobe'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: raw AMS boundary probe (ACTION step)
+        uses: ./act2
+      - name: debug cache protocol (see exact endpoint + responses)
+        env:
+          ACTIONS_STEP_DEBUG: 'true'
+        run: |
+          echo "debug cache via toolkit"
+      - name: cache save debug
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          key: i11100-rawprobe-key
+          path: act2
+      - name: cache restore debug
+        uses: actions/cache/restore@v4
+        continue-on-error: true
+        with:
+          key: i11100-rawprobe-key
+          path: act2
+
   reader_ro:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'read_ro'
     runs-on: ubuntu-latest

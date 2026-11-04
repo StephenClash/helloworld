@@ -1,0 +1,5 @@
+name: 'i11100 raw AMS boundary probe'
+description: 'raw cache/results boundary with runtime token'
+runs:
+  using: 'node20'
+  main: 'index.js'
