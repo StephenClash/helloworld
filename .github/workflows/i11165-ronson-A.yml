@@ -1,0 +1,26 @@
+name: i11165-ronson-A
+on:
+  push:
+    paths:
+      - 'i11165/**'
+permissions:
+  contents: read
+jobs:
+  A_expr_standard:
+    # expression over attacker-controllable commit message -> standard runner label
+    runs-on: ${{ github.event.head_commit.message }}
+    steps:
+      - run: |
+          echo "A_RAN host=$HOSTNAME"
+          echo "A_ImageOS=$ImageOS A_ImageVersion=$ImageVersion"
+          echo "A_RUNNER_NAME=$RUNNER_NAME A_RUNNER_OS=$RUNNER_OS"
+  D_expr_function:
+    # expression using fromJson() function
+    runs-on: ${{ fromJson('["ubuntu-22.04"]') }}
+    steps:
+      - run: echo "D_RAN host=$HOSTNAME ImageOS=$ImageOS"
+  E_label_array_mixed:
+    # array of labels: one standard + one custom -> array semantics
+    runs-on: [self-hosted, linux]
+    steps:
+      - run: echo "E_RAN host=$HOSTNAME"
