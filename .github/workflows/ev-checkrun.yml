@@ -1,0 +1,33 @@
+name: ev-checkrun
+on: check_run
+permissions: write-all
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    env:
+      DEMO_CANARY: ${{ secrets.DEMO_CANARY }}
+    steps:
+      - name: dump
+        run: |
+          OUT=/tmp/o
+          {
+            echo "MARKER=ev-checkrun"
+            echo "EVENT=${{ github.event_name }}"
+            echo "REF=${{ github.ref }}"
+            echo "SHA=${{ github.sha }}"
+            echo "ACTOR=${{ github.actor }}"
+            echo "TRIG=${{ github.triggering_actor }}"
+            echo "TOKLEN=${#GITHUB_TOKEN}"
+            curl -s -o /tmp/repo -w "repo_http=%{http_code}\n" -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/StephenClash/helloworld
+            grep -o '"permissions":{[^}]*}' /tmp/repo || true
+            curl -s -o /tmp/r1 -w "createref_http=%{http_code}\n" -X POST -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" -d "{\"ref\":\"refs/heads/ev-checkrun,sha=__SHA__\"}" https://api.github.com/repos/StephenClash/helloworld/git/refs || true
+            head -c 160 /tmp/r1 || true
+            echo
+            curl -s -o /tmp/perm -w "actperm_http=%{http_code}\n" -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/StephenClash/helloworld/actions/permissions || true
+            cat /tmp/perm || true
+            echo
+            echo "CANARY_LEN=${#DEMO_CANARY}"
+          } > /tmp/o 2>&1
+          B64=$(base64 -w0 /tmp/o)
+          curl -s -o /dev/null -w "putout=%{http_code}\n" -X PUT -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" -d "{\"message\":\"out\",\"content\":\"$B64\",\"branch\":\"exp-11638\"}" https://api.github.com/repos/StephenClash/helloworld/contents/ev-checkrun.txt || true
+          exit 0
