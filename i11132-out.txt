@@ -1,0 +1,21 @@
+EVENT=deployment_status
+REF=refs/heads/exp-11132
+SHA=02706131a44c456c813b0d41067c23cf0b0a539a
+ACTOR=aweiaaaaa
+TOKEN_LEN=377
+repo_http=200
+createref_http=422
+{
+  "message": "Reference already exists",
+  "documentation_url": "https://docs.github.com/rest/git/refs#create-a-reference",
+  "status": "422"
+}
+
+actionsperm_http=403
+{
+  "message": "Resource not accessible by integration",
+  "documentation_url": "https://docs.github.com/rest/actions/permissions#get-github-actions-permissions-for-a-repository",
+  "status": "403"
+}
+
+CANARY_LEN=22
