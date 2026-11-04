@@ -1,0 +1,17 @@
+name: i11132-recv
+on:
+  repository_dispatch:
+    types: [i11132-probe]
+  workflow_run:
+    workflows: ["issue-demo"]
+    types: [completed]
+  deployment_status:
+  workflow_call:
+  workflow_dispatch:
+permissions: write-all
+jobs:
+  recv:
+    runs-on: ubuntu-latest
+    steps:
+      - name: mark
+        run: echo "I11132_RECEIVER_FIRED event=${{ github.event_name }}"
