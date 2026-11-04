@@ -1,0 +1,34 @@
+name: cred-surface
+on: workflow_dispatch
+permissions: read-all
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - name: enumerate
+        env:
+          CANARY: ${{ secrets.DEMO_CANARY }}
+        run: |
+          echo "== NAMES =="
+          env | cut -d= -f1 | grep -Ei 'token|pat|secret|key|cred|auth|gh_' | sort | tr '\n' ' '
+          echo ""
+          echo "== CLASS =="
+          for n in $(env | cut -d= -f1 | grep -Ei 'token|pat|secret|key|cred|auth|gh_'); do
+            v="${!n}"
+            case "$v" in
+              ghp_*) c=CLASSIC_PAT;;
+              gho_*) c=OAUTH;;
+              ghu_*) c=USER_SERVER;;
+              ghs_*) c=APP_SERVER;;
+              github_pat_*) c=FINE_GRAINED;;
+              *) c=OTHER;;
+            esac
+            echo "$n len=${#v} class=$c"
+          done
+          echo "CANARY_LEN=${#CANARY}"
+          echo "== GITCFG =="
+          git config --global --list 2>/dev/null | sed 's/=.*/=<redacted>/' || echo none
+          echo "== GITCRED =="
+          if [ -f ~/.git-credentials ]; then echo present; else echo absent; fi
+          echo "== WORKSPACE =="
+          ls -a "$GITHUB_WORKSPACE" | head -20
