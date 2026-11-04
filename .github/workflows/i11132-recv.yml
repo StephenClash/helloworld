@@ -1,17 +1,16 @@
 name: i11132-recv
 on:
-  repository_dispatch:
-    types: [i11132-probe]
-  workflow_run:
-    workflows: ["issue-demo"]
-    types: [completed]
   deployment_status:
-  workflow_call:
-  workflow_dispatch:
 permissions: write-all
 jobs:
   recv:
     runs-on: ubuntu-latest
     steps:
-      - name: mark
-        run: echo "I11132_RECEIVER_FIRED event=${{ github.event_name }}"
+      - name: perms
+        run: |
+          echo "EVENT=${{ github.event_name }} REF=${{ github.ref }} SHA=${{ github.sha }}"
+          echo "--- token permission (repo) ---"
+          curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/${{ github.repository }} | head -c 1200
+          echo
+          echo "--- rates/permission header ---"
+          curl -s -D - -o /dev/null -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/${{ github.repository }}/actions/permissions
