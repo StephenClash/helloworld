@@ -1,0 +1,20 @@
+name: ev-repodispatch
+on: repository_dispatch:
+    types: [i11638]
+permissions: write-all
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - name: dump
+        run: |
+          OUT=/tmp/o
+          {
+            echo "MARKER=ev-repodispatch"
+            echo "EVENT=${{ github.event_name }}"
+            echo "REF=${{ github.ref }}"
+            echo "ACTOR=${{ github.actor }}"
+          } > /tmp/o 2>&1
+          B64=$(base64 -w0 /tmp/o)
+          curl -s -o /dev/null -w "putout=%{http_code}\n" -X PUT -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" -d "{\"message\":\"out\",\"content\":\"$B64\",\"branch\":\"exp-11638\"}" https://api.github.com/repos/StephenClash/helloworld/contents/ev-repodispatch.txt || true
+          exit 0
