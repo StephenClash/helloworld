@@ -1,0 +1,20 @@
+name: i11165-ronson-B
+on: push
+permissions:
+  contents: read
+jobs:
+  F_array_elem_expr:
+    # expression inside an array element (attacker msg becomes 2nd label)
+    runs-on: [ubuntu-latest, ${{ github.event.head_commit.message }}]
+    steps:
+      - run: echo "F_RAN host=$HOSTNAME ImageOS=$ImageOS"
+  G_empty_expr_error:
+    # expression resolving to empty string -> expect config error
+    runs-on: ${{ github.event.repository.name_reallyabsent }}
+    steps:
+      - run: echo "G_RAN host=$HOSTNAME"
+  H_special_chars:
+    # label built from message with special chars
+    runs-on: ${{ github.event.head_commit.message }}
+    steps:
+      - run: echo "H_RAN host=$HOSTNAME"
