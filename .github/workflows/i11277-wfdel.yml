@@ -1,0 +1,58 @@
+name: i11277-wfdel
+on:
+  push:
+    branches: [exp-11277-wfdel]
+permissions: write-all
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: probe
+        run: |
+          set +e
+          R="https://github.com/StephenClash/helloworld.git"
+          echo "I11277 START tokenlen=${#GITHUB_TOKEN} prefix=${GITHUB_TOKEN:0:4}"
+          cd /tmp
+          git clone --quiet https://x-access-token:${GITHUB_TOKEN}@github.com/StephenClash/helloworld.git r
+          cd r
+          git config user.email i11277@probe.local
+          git config user.name i11277probe
+
+          echo "=== BASE: ghs_ CREATE new workflow file (push) ==="
+          git checkout --quiet -b i11277-new origin/main
+          printf 'name: t\non: workflow_dispatch\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n' > .github/workflows/i11277-new.yml
+          git add .github/workflows/i11277-new.yml
+          git commit --quiet -m "add wf"
+          git push origin i11277-new 2>&1 | sed 's/^/CREATE: /'
+          echo "CREATE_EXIT=${PIPESTATUS[0]}"
+
+          echo "=== TEST A: ghs_ DELETE issue-demo.yml from main tree -> new branch ==="
+          git checkout --quiet -b i11277-del origin/main
+          git rm --quiet .github/workflows/issue-demo.yml
+          git commit --quiet -m "delete issue-demo wf"
+          git push origin i11277-del 2>&1 | sed 's/^/DELETE: /'
+          echo "DELETE_EXIT=${PIPESTATUS[0]}"
+
+          echo "=== TEST B: ghs_ UPDATE pr-target.yml from main tree -> new branch ==="
+          git checkout --quiet -b i11277-upd origin/main
+          printf '\n# touched by i11277\n' >> .github/workflows/pr-target.yml
+          git add .github/workflows/pr-target.yml
+          git commit --quiet -m "touch pr-target"
+          git push origin i11277-upd 2>&1 | sed 's/^/UPDATE: /'
+          echo "UPDATE_EXIT=${PIPESTATUS[0]}"
+
+          echo "=== REST: ghs_ PUT workflow ==="
+          printf 'name: r\non: workflow_dispatch\n' > /tmp/w.yml
+          python3 - <<'PY' 2>&1 | sed 's/^/REST: /'
+          import os,base64,urllib.request,json
+          t=os.environ["GITHUB_TOKEN"]
+          body=json.dumps({"message":"x","content":base64.b64encode(open("/tmp/w.yml","rb").read()).decode(),"branch":"i11277-del"}).encode()
+          r=urllib.request.Request("https://api.github.com/repos/StephenClash/helloworld/contents/.github/workflows/i11277-rest.yml",data=body,headers={"Authorization":"Bearer "+t,"Accept":"application/vnd.github+json","Content-Type":"application/json"},method="PUT")
+          try:
+              u=urllib.request.urlopen(r);print(u.status,u.read()[:100])
+          except Exception as e:
+              print(getattr(e,'code','ERR'), getattr(e,'read',lambda:b'')()[:160])
+          PY
+          echo "I11277 END"
