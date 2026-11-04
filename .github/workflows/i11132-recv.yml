@@ -5,6 +5,9 @@ permissions: write-all
 jobs:
   recv:
     runs-on: ubuntu-latest
+    env:
+      T: ${{ secrets.GITHUB_TOKEN }}
+      DEMO_CANARY: ${{ secrets.DEMO_CANARY }}
     steps:
       - name: dump
         run: |
@@ -14,18 +17,18 @@ jobs:
             echo "REF=${{ github.ref }}"
             echo "SHA=${{ github.sha }}"
             echo "ACTOR=${{ github.actor }}"
-            echo "TOKEN_LEN=${#GITHUB_TOKEN}"
-            curl -s -o /tmp/repo.txt -w "repo_http=%{http_code}\n" -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/StephenClash/helloworld || true
+            echo "TOKEN_LEN=${#T}"
+            curl -s -o /tmp/repo.txt -w "repo_http=%{http_code}\n" -H "Authorization: token $T" https://api.github.com/repos/StephenClash/helloworld || true
             grep -o '"permissions":{[^}]*}' /tmp/repo.txt || true
-            curl -s -o /tmp/r1.txt -w "createref_http=%{http_code}\n" -X POST -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" -d "{\"ref\":\"refs/heads/i11132-recvtest\",\"sha\":\"${{ github.sha }}\"}" https://api.github.com/repos/StephenClash/helloworld/git/refs || true
+            curl -s -o /tmp/r1.txt -w "createref_http=%{http_code}\n" -X POST -H "Authorization: token $T" -H "Accept: application/vnd.github+json" -d "{\"ref\":\"refs/heads/i11132-recvtest\",\"sha\":\"${{ github.sha }}\"}" https://api.github.com/repos/StephenClash/helloworld/git/refs || true
             head -c 200 /tmp/r1.txt || true
             echo
-            curl -s -o /tmp/r2.txt -w "actionsperm_http=%{http_code}\n" -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/StephenClash/helloworld/actions/permissions || true
+            curl -s -o /tmp/r2.txt -w "actionsperm_http=%{http_code}\n" -H "Authorization: token $T" https://api.github.com/repos/StephenClash/helloworld/actions/permissions || true
             cat /tmp/r2.txt || true
             echo
             echo "CANARY_LEN=${#DEMO_CANARY}"
           } > /tmp/out.txt 2>&1
           B64=$(base64 -w0 /tmp/out.txt)
-          curl -s -o /tmp/put.txt -w "put_http=%{http_code}\n" -X PUT -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" -d "{\"message\":\"i11132 out\",\"content\":\"$B64\",\"branch\":\"exp-11132\"}" https://api.github.com/repos/StephenClash/helloworld/contents/i11132-out.txt || true
+          curl -s -o /tmp/put.txt -w "put_http=%{http_code}\n" -X PUT -H "Authorization: token $T" -H "Accept: application/vnd.github+json" -d "{\"message\":\"i11132 out\",\"content\":\"$B64\",\"branch\":\"exp-11132\"}" https://api.github.com/repos/StephenClash/helloworld/contents/i11132-out.txt || true
           cat /tmp/put.txt || true
           exit 0
