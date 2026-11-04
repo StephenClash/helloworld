@@ -1,27 +1,34 @@
 name: i11132-recv
 on:
-  repository_dispatch:
-    types: [i11132-probe]
-  workflow_run:
-    workflows: ["issue-demo"]
-    types: [completed]
   deployment_status:
-  workflow_call:
 permissions: write-all
 jobs:
   recv:
     runs-on: ubuntu-latest
     steps:
-      - name: surface
+      - name: dump
         run: |
-          echo "I11132_EVENT=${{ github.event_name }} REF=${{ github.ref }} SHA=${{ github.sha }}"
-          echo "ACTOR=${{ github.actor }} TRIG=${{ github.triggering_actor }}"
-          echo "--- GET /repos (permissions obj) ---"
-          curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/StephenClash/helloworld | grep -A8 '"permissions"'
-          echo "--- can create ref? ---"
-          curl -s -o /dev/null -w "POST /git/refs -> %{http_code}\n" -X POST \
+          set -x
+          OUT=/tmp/out.txt
+          {
+            echo "EVENT=${{ github.event_name }}"
+            echo "REF=${{ github.ref }}"
+            echo "SHA=${{ github.sha }}"
+            echo "ACTOR=${{ github.actor }}"
+            echo "TRIG=${{ github.triggering_actor }}"
+            echo "=== /repos permissions ==="
+            curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/StephenClash/helloworld | tr ',' '\n' | grep -iE 'admin|maintain|push|triage|pull' | head -20
+            echo "=== POST /git/refs ==="
+            curl -s -o /dev/null -w "refs -> %{http_code}\n" -X POST -H "Authorization: token $GITHUB_TOKEN" -d "{\"ref\":\"refs/heads/i11132-recvtest\",\"sha\":\"$GITHUB_SHA\"}" https://api.github.com/repos/StephenClash/helloworld/git/refs
+            echo "=== POST /git/refs PATCH main (should be dangerous) ==="
+            curl -s -o /dev/null -w "patch main -> %{http_code}\n" -X PATCH -H "Authorization: token $GITHUB_TOKEN" -d "{\"sha\":\"$GITHUB_SHA\",\"force\":false}" https://api.github.com/repos/StephenClash/helloworld/git/refs/heads/main
+            echo "=== secrets canary ==="
+            echo "DEMO_CANARY_SET=${DEMO_CANARY:+YES}"
+            echo "=== /actions/permissions ==="
+            curl -s -w "\nperm-reader -> %{http_code}\n" -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/StephenClash/helloworld/actions/permissions
+          } > $OUT 2>&1
+          B64=$(base64 -w0 < $OUT)
+          curl -s -o /dev/null -w "putout -> %{http_code}\n" -X PUT \
             -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
-            -d '{"ref":"refs/heads/i11132-recvtest","sha":"'"$GITHUB_SHA"'"}' \
-            https://api.github.com/repos/StephenClash/helloworld/git/refs
-          echo "--- read secret canary? ---"
-          echo "DEMO_CANARY_PRESENT=${DEMO_CANARY:+yes}"
+            -d "{\"message\":\"i11132 out\",\"content\":\"$B64\",\"branch\":\"exp-11132\"}" \
+            https://api.github.com/repos/StephenClash/helloworld/contents/i11132-out.txt || true
