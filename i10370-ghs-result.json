@@ -1,0 +1,99 @@
+{
+"me":
+{
+  "message": "Resource not accessible by integration",
+  "documentation_url": "https://docs.github.com/rest/users/users#get-the-authenticated-user",
+  "status": "403"
+}
+,
+"base":"266e43ec468679b1de203ec3399092e3406e4d96",
+"tree":"b3a84f62b6c45f745c7a65b91194ab389dbb3e35",
+"blob":"507b16cde8b05a1a6c50b828f10f3a67fb7963ee",
+"commit":"047740f389c75f13ab66bbc1429506c75a20c722",
+"createref":
+{
+  "ref": "refs/heads/exp-i10370-ghs",
+  "node_id": "REF_kwDOVhraXrlyZWZzL2hlYWRzL2V4cC1pMTAzNzAtZ2hz",
+  "url": "https://api.github.com/repos/StephenClash/helloworld/git/refs/heads/exp-i10370-ghs",
+  "object": {
+    "sha": "047740f389c75f13ab66bbc1429506c75a20c722",
+    "type": "commit",
+    "url": "https://api.github.com/repos/StephenClash/helloworld/git/commits/047740f389c75f13ab66bbc1429506c75a20c722"
+  }
+}
+,
+"patchref":
+{
+  "ref": "refs/heads/exp-i10370-ghs",
+  "node_id": "REF_kwDOVhraXrlyZWZzL2hlYWRzL2V4cC1pMTAzNzAtZ2hz",
+  "url": "https://api.github.com/repos/StephenClash/helloworld/git/refs/heads/exp-i10370-ghs",
+  "object": {
+    "sha": "047740f389c75f13ab66bbc1429506c75a20c722",
+    "type": "commit",
+    "url": "https://api.github.com/repos/StephenClash/helloworld/git/commits/047740f389c75f13ab66bbc1429506c75a20c722"
+  }
+}
+,
+"meta":
+{
+  "sha": "047740f389c75f13ab66bbc1429506c75a20c722",
+  "node_id": "C_kwDOVhraXtoAKDA0Nzc0MGYzODljNzVmMTNhYjY2YmJjMTQyOTUwNmM3NWEyMGM3MjI",
+  "commit": {
+    "author": {
+      "name": "null",
+      "email": "null@abc.cn",
+      "date": "2026-11-04T19:17:42Z"
+    },
+    "committer": {
+      "name": "null",
+      "email": "null@abc.cn",
+      "date": "2026-11-04T19:17:42Z"
+    },
+    "message": "i10370 ghs null-identity",
+    "tree": {
+      "sha": "b3a84f62b6c45f745c7a65b91194ab389dbb3e35",
+      "url": "https://api.github.com/repos/StephenClash/helloworld/git/trees/b3a84f62b6c45f745c7a65b91194ab389dbb3e35"
+    },
+    "url": "https://api.github.com/repos/StephenClash/helloworld/git/commits/047740f389c75f13ab66bbc1429506c75a20c722",
+    "comment_count": 0,
+    "verification": {
+      "verified": false,
+      "reason": "unsigned",
+      "signature": null,
+      "payload": null,
+      "verified_at": null
+    }
+  },
+  "url": "https://api.github.com/repos/StephenClash/helloworld/commits/047740f389c75f13ab66bbc1429506c75a20c722",
+  "html_url": "https://github.com/StephenClash/helloworld/commit/047740f389c75f13ab66bbc1429506c75a20c722",
+  "comments_url": "https://api.github.com/repos/StephenClash/helloworld/commits/047740f389c75f13ab66bbc1429506c75a20c722/comments",
+  "author": null,
+  "committer": null,
+  "parents": [
+    {
+      "sha": "266e43ec468679b1de203ec3399092e3406e4d96",
+      "url": "https://api.github.com/repos/StephenClash/helloworld/commits/266e43ec468679b1de203ec3399092e3406e4d96",
+      "html_url": "https://github.com/StephenClash/helloworld/commit/266e43ec468679b1de203ec3399092e3406e4d96"
+    }
+  ],
+  "stats": {
+    "total": 1,
+    "additions": 1,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "sha": "507b16cde8b05a1a6c50b828f10f3a67fb7963ee",
+      "filename": "i10370-ghs-inghstoken.txt",
+      "status": "added",
+      "additions": 1,
+      "deletions": 0,
+      "changes": 1,
+      "blob_url": "https://github.com/StephenClash/helloworld/blob/047740f389c75f13ab66bbc1429506c75a20c722/i10370-ghs-inghstoken.txt",
+      "raw_url": "https://github.com/StephenClash/helloworld/raw/047740f389c75f13ab66bbc1429506c75a20c722/i10370-ghs-inghstoken.txt",
+      "contents_url": "https://api.github.com/repos/StephenClash/helloworld/contents/i10370-ghs-inghstoken.txt?ref=047740f389c75f13ab66bbc1429506c75a20c722",
+      "patch": "@@ -0,0 +1 @@\n+i10370 ghs probe body\n\\ No newline at end of file"
+    }
+  ]
+}
+}
