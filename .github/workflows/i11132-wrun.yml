@@ -1,0 +1,11 @@
+name: i11132-wrun
+on:
+  workflow_run:
+    workflows: ["issue-demo"]
+    types: [completed]
+permissions: write-all
+jobs:
+  recv:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "WRUN_FIRED event=${{ github.event_name }}"
