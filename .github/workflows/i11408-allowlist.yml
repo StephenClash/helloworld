@@ -1,19 +1,8 @@
-name: i11408-allowlist-probe
+锘縩ame: i11408-allowlist-probe
 on: push
 permissions: write-all
 jobs:
-  gh-owned:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: perms
-        run: |
-          echo "GH_OWNED_OK"
-          curl -s -o /dev/null -w "AP_HTTP=%{http_code}\n" -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/$GITHUB_REPOSITORY/actions/permissions
-          curl -s -o /dev/null -w "RUNNERS_HTTP=%{http_code}\n" -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runners
   thirdparty-missing:
     runs-on: ubuntu-latest
     steps:
       - uses: zzz-no-such-owner-11408/no-such-action-11408@v1
-  reusable-missing:
-    uses: StephenClash/helloworld/.github/workflows/no-such-reusable-i11408.yml@main
