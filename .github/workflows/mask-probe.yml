@@ -1,0 +1,17 @@
+name: mask-probe
+on: issues
+permissions: read-all
+jobs:
+  m:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          CANARY: ${{ secrets.DEMO_CANARY }}
+          BODY: ${{ github.event.issue.body }}
+        run: |
+          DERIVED=$(printf %s "$CANARY" | sha256sum | cut -c1-16)
+          echo "::add-mask::$DERIVED"
+          echo "BEFORE=$DERIVED"
+          echo "$BODY"
+          echo "AFTER=$DERIVED"
+          echo "PLAIN=$CANARY"
