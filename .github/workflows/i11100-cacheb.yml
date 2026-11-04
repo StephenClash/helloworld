@@ -1,0 +1,20 @@
+name: i11100-cacheB
+on:
+  push:
+    branches: [ exp-11100b ]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: restore cache written on ANOTHER branch (read-only token)
+        uses: actions/cache/restore@v4
+        with:
+          key: i11100-poison
+          path: cachepayload
+      - name: inspect cross-branch restore
+        run: |
+          echo "CROSSBRANCH_RESTORE:"; cat cachepayload/marker.txt 2>/dev/null || echo "NOT_RESTORED"

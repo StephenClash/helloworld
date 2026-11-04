@@ -1,0 +1,5 @@
+name: 'i11100 runtime-cred dump'
+description: 'dump ACTIONS_RUNTIME_TOKEN scope + probe cache service protocol (read-only-ish, isolated branch)'
+runs:
+  using: 'node20'
+  main: 'index.js'
