@@ -1,0 +1,27 @@
+name: sink-probe
+on: issues
+permissions: write-all
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - name: env-sink
+        env:
+          BODY: ${{ github.event.issue.body }}
+        run: |
+          echo "ENV_LEN=${#BODY}"
+          echo "ENV_RAW=$BODY"
+      - name: with-sink
+        uses: actions/github-script@v7
+        with:
+          script: |
+            console.log(`WSINK=${{ github.event.issue.body }}`)
+      - name: unit-write
+        env:
+          TOK: ${{ github.token }}
+          NUM: ${{ github.event.issue.number }}
+        run: |
+          C=$(curl -s -o /tmp/o -w "%{http_code}" -X POST -H "Authorization: Bearer $TOK" "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/issues/$NUM/comments" -d '{"body":"unit-write-probe"}')
+          echo "ISSUE_COMMENT_WRITE=$C"
+          R=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Authorization: Bearer $TOK" "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/git/refs" -d "{\"ref\":\"refs/heads/sink-$(date +%s)\",\"sha\":\"${{ github.sha }}\"}")
+          echo "REF_CREATE=$R"
