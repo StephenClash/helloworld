@@ -1,0 +1,13 @@
+name: i11099-diff
+on:
+  push:
+    branches:
+      - exp-11099
+permissions: write-all
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: run diff
+        run: bash .github/i11099_probe.sh
